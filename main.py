@@ -8,7 +8,7 @@ from telegram_bot_calendar import DetailedTelegramCalendar
 import datetime
 from highprice import highprice
 from config import token, CityInputError, APIError, ElemQtyError, PriceRangeInputError, CityFindingError, MinMaxError, DistanceError, HotelsQtyError, YesOrNoError, NoHotelsError, NoHistoryError
-from botdb import insert, fetch_by_id
+from botdb import insert, fetch_by_id, create_db
 
 bot = telebot.TeleBot(token)
 
@@ -231,6 +231,7 @@ def main_func(message):
         except APIError as api_error:
             bot.send_message(message.from_user.id, str(api_error))
         else:
+            create_db()
             insert(user_id=user_info[message.from_user.id]['user_id'], city=user_info[message.from_user.id]['city'],
                    city_id=user_info[message.from_user.id]['city_id'], checkin=user_info[message.from_user.id]['checkin'],
                    checkout=user_info[message.from_user.id]['checkout'], command=user_info[message.from_user.id]['command'],

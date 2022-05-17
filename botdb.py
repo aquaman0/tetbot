@@ -4,6 +4,24 @@ import json
 from config import NoHistoryError
 
 
+def create_db():
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    db_path = os.path.join(BASE_DIR, 'bot_database.db')
+    with sqlite3.connect(db_path) as conn:
+        cur = conn.cursor()
+        cur.execute("""CREATE TABLE IF NOT EXISTS bot_history (
+                    num_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    user_id TEXT NOT NULL,
+                    city TEXT NOT NULL,
+                    city_id INTEGER NOT NULL,
+                    checkin DATE NOT NULL,
+                    checkout DATE NOT NULL,
+                    command TEXT NOT NULL,
+                    command_time DATETIME NOT NULL,
+                    results TEXT)""")
+        conn.commit()
+
+
 def insert(user_id, city, city_id, checkin, checkout, command, command_time, results):
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     db_path = os.path.join(BASE_DIR, 'bot_database.db')
