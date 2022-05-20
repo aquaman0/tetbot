@@ -1,10 +1,32 @@
 import requests
 import json
-from config import APIError
+from config import APIError, NoHotelsError
 from datetime import datetime
+from collections.abc import Iterable
 
 
-def lowprice(data):
+def lowprice(data: dict) -> Iterable[tuple]:
+    """
+    Функция, которая осуществляет поиск отелей, фильтруя их по возрастанию цены, получая
+    данные от пользователя.
+
+    Проверяется успешен ли был запрос к API, если код ответа "200", далее проверяется заполнен
+    ли полученный от API список, если исключений не было, то при помощи json-обработки
+    формируется ответ от API.
+
+    Проверяется есть ли ключ "streetAddress" в словаре hotel["address"], так как при поиске в некоторых
+    городах, такой ключ отсутствует и вместо полного адреса будет выводится значение ключа hotel["address"].
+
+    Далее, в цикле ведётся поиск подходящих отелей, генерируются кортежи с необходимыми значениями,
+    до тех пор пока количество отелей не будет равно количеству отелей, полученных от пользователя.
+
+    Если получен пустой список при обращении к API, то вызывается исключение "NoHotelsError", которое обрабатывается
+    в основной функции.
+
+    Если возникла ошибка при обращении к API, то вызывается исключение "APIError", которое обрабатывается
+    в основной функции.
+    """
+
     url = "https://hotels-com-provider.p.rapidapi.com/v1/hotels/search"
 
     querystring = {"checkin_date": data['checkin'], "checkout_date": data['checkout'],
@@ -22,11 +44,22 @@ def lowprice(data):
         checkout = data['checkout'].split('-')
         period = datetime(int(checkout[0]), int(checkout[1]), int(checkout[2])) - datetime(int(checkin[0]), int(checkin[1]), int(checkin[2]))
         data_response = json.loads(response.text)
-        for i, hotel in enumerate(data_response['searchResults']['results'], start=0):
-            i += 1
-            yield hotel['id'], hotel['name'], hotel['address']['streetAddress'], hotel['landmarks'][0]['distance'], \
-                  hotel['ratePlan']['price']['current'], str(round(hotel['ratePlan']['price']['exactCurrent'] * period.days, 2)) + ' RUB'
-            if i == int(data['hotelsQty']):
-                break
+        if data_response['searchResults']['results']:
+            for i, hotel in enumerate(data_response['searchResults']['results'], start=0):
+                i += 1
+                if 'streetAddress' in hotel['address']:
+                    yield hotel['id'], hotel['name'], hotel['address']['streetAddress'], \
+                          hotel['landmarks'][0]['distance'], hotel['ratePlan']['price']['current'], \
+                          str(round(hotel['ratePlan']['price']['exactCurrent'] * period.days, 2)) + ' RUB'
+                    if i == int(data['hotelsQty']):
+                        break
+                else:
+                    yield hotel['id'], hotel['name'], hotel['address']['locality'], \
+                          hotel['landmarks'][0]['distance'], hotel['ratePlan']['price']['current'], \
+                          str(round(hotel['ratePlan']['price']['exactCurrent'] * period.days, 2)) + ' RUB'
+                    if i == int(data['hotelsQty']):
+                        break
+        else:
+            raise NoHotelsError
     else:
         raise APIError

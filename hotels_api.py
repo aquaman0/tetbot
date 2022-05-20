@@ -5,7 +5,20 @@ from telebot.types import InputMediaPhoto
 from config import APIError, CityFindingError
 
 
-def get_cities_dict(user_city: str):
+def get_cities_dict(user_city: str) -> dict:
+    """
+    Функция, которая находит похожие города на город, введенный пользователем.
+
+    Если похожих городов не было найдено, вызывается исключение "CityFindingError",
+    которое обрабатывается в основной функции.
+
+    Если при обращении к API возникла ошибка, то есть код ответа "200", то вызывается
+    исключение "APIError", которое обрабатывается в основной функции.
+
+    :param user_city: Название города.
+    :return: Словарь, где ключи id городов, а значения - названия городов.
+    """
+
     url = "https://hotels-com-provider.p.rapidapi.com/v1/destinations/search"
 
     querystring = {"query": user_city, "currency": "RUB", "locale": "ru_RU"}
@@ -34,7 +47,15 @@ def get_cities_dict(user_city: str):
         raise APIError
 
 
-def get_photos(hotel_id, qty):
+def get_photos(hotel_id: int, qty: str) -> list:
+    """
+    Функция, которая создаёт список из InputMediaPhoto-объектов по id отеля, полученного
+    от пользователя в соответствии с заданным количеством.
+
+    :param hotel_id: id отеля.
+    :param qty: Количество фотографий.
+    :return: Список InputMediaPhoto-объектов.
+    """
     url = "https://hotels-com-provider.p.rapidapi.com/v1/hotels/photos"
 
     querystring = {"hotel_id": hotel_id}
