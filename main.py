@@ -1,17 +1,15 @@
-import telebot
-from telebot import types
+from telebot import types, TeleBot
+from telebot.types import InputMediaPhoto
 from hotels_api import get_cities_dict
-from bestdeal import bestdeal
-from hotels_api import get_photos
-from lowprice import lowprice
+from hotels_api import get_hotels
 from telegram_bot_calendar import DetailedTelegramCalendar
 import datetime
-from highprice import highprice
 from config import token, CityInputError, APIError, ElemQtyError, PriceRangeInputError, CityFindingError
 from config import MinMaxError, DistanceError, HotelsQtyError, YesOrNoError, NoHotelsError, NoHistoryError
+from config import city_choose_markup, dist_markup, hotels_Qty_markup, price_range_check, photo_req_markup, photo_Qty_markup
 from botdb import insert, fetch_by_id, create_db, is_db_exists
 
-bot = telebot.TeleBot(token)
+bot = TeleBot(token)
 
 
 @bot.message_handler(commands=['start'])
@@ -81,6 +79,12 @@ def main_func(message: types.Message) -> None:
         user_info[message.from_user.id]['user_id']: int = message.from_user.id
         user_info[message.from_user.id]['user_command']: str = message.text
         user_info[message.from_user.id]['command_time']: datetime.datetime = datetime.datetime.now()
+        if user_info[message.from_user.id]['user_command'] == '/lowprice':
+            user_info[message.from_user.id]['sort_order'] = 'PRICE'
+        elif user_info[message.from_user.id]['user_command'] == '/highprice':
+            user_info[message.from_user.id]['sort_order'] = 'PRICE_HIGHEST_FIRST'
+        elif user_info[message.from_user.id]['user_command'] == '/bestdeal':
+            user_info[message.from_user.id]['sort_order'] = 'DISTANCE_FROM_LANDMARK'
         bot.send_message(message.from_user.id, 'Введите название города:')
         bot.register_next_step_handler(message, get_city)
 
@@ -104,11 +108,7 @@ def main_func(message: types.Message) -> None:
         try:
             if not any(d in message.text for d in '0123456789'):
                 cities_dict: dict = get_cities_dict(message.text)
-                cities = cities_dict.values()
-                cities_markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
-                for city in cities:
-                    cities_markup.add(city)
-
+                cities_markup = city_choose_markup(cities_dict.values())
                 bot.send_message(message.from_user.id, 'Выберите нужный город:', reply_markup=cities_markup)
                 bot.register_next_step_handler(message, choose_city, cities_dict)
             else:
@@ -179,24 +179,14 @@ def main_func(message: types.Message) -> None:
         """
 
         try:
-            prices_range: list = message.text.split()
-            if len(prices_range) != 2:
-                raise ElemQtyError
-            else:
-                if prices_range[0].isdigit() and prices_range[1].isdigit():
-                    if int(prices_range[1]) <= int(prices_range[0]):
-                        raise MinMaxError
-                    else:
-                        user_info[message.from_user.id]['min_price']: str = prices_range[0]
-                        user_info[message.from_user.id]['max_price']: str = prices_range[1]
-                        dist_markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
-                        dist_markup.row('1', '3', '5')
-                        msg = bot.send_message(message.from_user.id,
-                                               text='Выберите необходимое расстояние до центра (в км)',
-                                               reply_markup=dist_markup)
-                        bot.register_next_step_handler(msg, save_distance)
-                else:
-                    raise PriceRangeInputError
+            if price_range_check(message.text):
+                prices_range: list = message.text.split()
+                user_info[message.from_user.id]['min_price']: str = prices_range[0]
+                user_info[message.from_user.id]['max_price']: str = prices_range[1]
+                msg = bot.send_message(message.from_user.id,
+                                       text='Выберите необходимое расстояние до центра (в км)',
+                                       reply_markup=dist_markup())
+                bot.register_next_step_handler(msg, save_distance)
         except (ElemQtyError, MinMaxError, PriceRangeInputError) as error:
             bot.send_message(message.from_user.id, str(error))
             bot.send_message(message.from_user.id, 'Введите диапазон цен через пробел (например: 5000 10000):')
@@ -225,12 +215,9 @@ def main_func(message: types.Message) -> None:
                 raise DistanceError
         except DistanceError as distance_error:
             bot.send_message(message.from_user.id, str(distance_error))
-            dist_markup: types.ReplyKeyboardMarkup = types.ReplyKeyboardMarkup(one_time_keyboard=True,
-                                                                               resize_keyboard=True)
-            dist_markup.row('1', '3', '5')
             msg = bot.send_message(message.from_user.id,
                                    text='Выберите необходимое расстояние до центра (в км)',
-                                   reply_markup=dist_markup)
+                                   reply_markup=dist_markup())
             bot.register_next_step_handler(msg, save_distance)
 
     def checkin(message: types.Message, checkin_date: datetime.date) -> None:
@@ -249,7 +236,7 @@ def main_func(message: types.Message) -> None:
         :param checkin_date: Дата заезда в формате datetime.date,
         полученная в результате выполнения callback-функции.
         """
-        user_info[message.id]['checkin']: str = str(checkin_date)
+        user_info[message.id]['checkin'] = checkin_date
         date_markup, step = DetailedTelegramCalendar(min_date=checkin_date,
                                                      calendar_id=2).build()
         bot.send_message(message.id, 'Выберите дату отъезда из отеля:', reply_markup=date_markup)
@@ -270,12 +257,9 @@ def main_func(message: types.Message) -> None:
         :param checkout_date: Дата отъезда в формате datetime.date,
         полученная в результате выполнения callback-функции.
         """
-        user_info[message.id]['checkout']: str = str(checkout_date)
-        hotels_Qty_markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
-        hotels_Qty_markup.row('1', '2', '3')
-        hotels_Qty_markup.row('4', '5', '6')
+        user_info[message.id]['checkout'] = checkout_date
         msg = bot.send_message(message.id, text='Введите кол-во отелей (максимум - 6)',
-                               reply_markup=hotels_Qty_markup)
+                               reply_markup=hotels_Qty_markup())
         bot.register_next_step_handler(msg, hotels_Qty)
 
     def hotels_Qty(message: types.Message) -> None:
@@ -295,21 +279,15 @@ def main_func(message: types.Message) -> None:
         try:
             if message.text.isdigit():
                 user_info[message.from_user.id]['hotelsQty']: str = message.text
-                photo_req_markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
-                photo_req_markup.row('Да', 'Нет')
-                bot.send_message(message.from_user.id, 'Загрузить фото отелей?', reply_markup=photo_req_markup)
+                bot.send_message(message.from_user.id, 'Загрузить фото отелей?', reply_markup=photo_req_markup())
                 bot.register_next_step_handler(message, photo_req)
             else:
                 raise HotelsQtyError
         except HotelsQtyError as hotels_qty_error:
             bot.send_message(message.from_user.id, str(hotels_qty_error))
-            hotels_Qty_markup: types.ReplyKeyboardMarkup = types.ReplyKeyboardMarkup(one_time_keyboard=True,
-                                                                                     resize_keyboard=True)
-            hotels_Qty_markup.row('1', '2', '3')
-            hotels_Qty_markup.row('4', '5', '6')
             msg = bot.send_message(message.from_user.id,
                                    text='Введите кол-во отелей (максимум - 6)',
-                                   reply_markup=hotels_Qty_markup)
+                                   reply_markup=hotels_Qty_markup())
             bot.register_next_step_handler(msg, hotels_Qty)
 
     def photo_req(message: types.Message) -> None:
@@ -329,20 +307,16 @@ def main_func(message: types.Message) -> None:
 
         try:
             if message.text.lower() == 'да':
-                photo_Qty_markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
-                photo_Qty_markup.row('1', '2', '3')
-                photo_Qty_markup.row('4', '5', '6')
-                photo_Qty_markup.row('7', '8', '9')
                 bot.send_message(message.from_user.id, 'Введите кол-во фото (максимум - 9)',
-                                 reply_markup=photo_Qty_markup)
+                                 reply_markup=photo_Qty_markup())
                 bot.register_next_step_handler(message, command_redirection)
-            elif message.text.lower() != 'да' or message.text.lower() != 'нет':
+            elif message.text.lower() == 'нет':
+                command_redirection(message)
+            else:
                 raise YesOrNoError
         except YesOrNoError as yes_or_no_error:
             bot.send_message(message.from_user.id, str(yes_or_no_error))
-            photo_req_markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
-            photo_req_markup.row('Да', 'Нет')
-            bot.send_message(message.from_user.id, 'Загрузить фото отелей?', reply_markup=photo_req_markup)
+            bot.send_message(message.from_user.id, 'Загрузить фото отелей?', reply_markup=photo_req_markup())
             bot.register_next_step_handler(message, photo_req)
 
     def command_redirection(message: types.Message) -> None:
@@ -351,24 +325,8 @@ def main_func(message: types.Message) -> None:
         которая, во вложенный словарь "user_info[message.from_user.id]" записывает ключ "results"
         со значением пустого списка для дальнейшей записи полученных результатов на запрос в базу данных.
 
-        Следующим шагом проверяется, какую команду вызвал пользователь.
-        Если вызвана команда "/lowprice", при помощи цикла вызывается
-        импортированная функция "lowprice", которая принимает в качестве аргумента
-        словарь "user_info[message.from_user.id]", содержащий информацию о конкретном пользователе.
-        Функция путем обращения к API генерирует кортеж, состоящий из значений, соответствующих запросу.
-        Бот отправляет пользователю сформированное из кортежа сообщение с ответом на запрос,
-        добавляется элемент в список "user_info[message.from_user.id]['results']" с информацией об отеле.
-
-        Если пользователь запрашивал фотографии, сначала во вложенный словарь "user_info[message.from_user.id]"
-        записывается 2 пары:
-        "photoQty": количество фотографий, запрошенных пользователем,
-        "photos": список, содержащий элементы "InputMediaPhoto" библиотеки "telebot.types",
-        найденных по переданному в качестве аргумента id отеля.
-
-        Бот отправляет пользователю сгруппированные в одно сообщение фотографии по каждому отелю.
-
-        По тому же принципу, при вызове пользователем команды "/highprice", вызывается импортированная
-        функция "highprice", а при вызове команды "/bestdeal", вызывается импортированная функция "bestdeal".
+        Следующим шагом в цикле функция получает информацию об отеле при помощи генератора.
+        Если были запрошены фотографии отеля, то формирует медиа-группу, если нет, то отправляет описание отеля.
 
         Обработка исключений.
         "NoHotelsError" вызывается если всё заполнено верно, запрос к API отработал
@@ -384,32 +342,24 @@ def main_func(message: types.Message) -> None:
         Вызывается функция "help_func" для выбора пользователем дальнейших действий.
         """
 
-        user_info[message.from_user.id]['results'] = []
+        user_info[message.from_user.id]['results']: list = []
         try:
-            if user_info[message.from_user.id]['user_command'] == '/lowprice':
-                for i_hotel in lowprice(user_info[message.from_user.id]):
-                    bot.send_message(message.from_user.id, i_hotel[1])
-                    user_info[message.from_user.id]['results'].append(i_hotel[1])
-                    if message.text.isdigit():
-                        user_info[message.from_user.id]['photoQty'] = message.text
-                        user_info[message.from_user.id]['photos'] = get_photos(i_hotel[0], message.text)
-                        bot.send_media_group(message.from_user.id, user_info[message.from_user.id]['photos'])
-            elif user_info[message.from_user.id]['user_command'] == '/highprice':
-                for i_hotel in highprice(user_info[message.from_user.id]):
-                    bot.send_message(message.from_user.id, i_hotel[1])
-                    user_info[message.from_user.id]['results'].append(i_hotel[1])
-                    if message.text.isdigit():
-                        user_info[message.from_user.id]['photoQty'] = message.text
-                        user_info[message.from_user.id]['photos'] = get_photos(i_hotel[0], message.text)
-                        bot.send_media_group(message.from_user.id, user_info[message.from_user.id]['photos'])
-            elif user_info[message.from_user.id]['user_command'] == '/bestdeal':
-                for i_hotel in bestdeal(user_info[message.from_user.id]):
-                    bot.send_message(message.from_user.id, i_hotel[1])
-                    user_info[message.from_user.id]['results'].append(i_hotel[1])
-                    if message.text.isdigit():
-                        user_info[message.from_user.id]['photoQty'] = message.text
-                        user_info[message.from_user.id]['photos'] = get_photos(i_hotel[0], message.text)
-                        bot.send_media_group(message.from_user.id, user_info[message.from_user.id]['photos'])
+            for hotel in get_hotels(user_info[message.from_user.id]):
+                text = f'Название отеля: {hotel["hotel_name"]}\n'\
+                       f'Адрес отеля: {hotel["hotel_address"]}\n'\
+                       f'От центра: {hotel["center_distance"]}\n'\
+                       f'Цена за ночь: {hotel["price_current"]}\n'\
+                       f'Общая стоимость: {hotel["price_total"]}\n'\
+                       f'Ссылка: {hotel["web"]}'
+                user_info[message.from_user.id]['results'].append(text)
+                if message.text.isdigit():
+                    media_group = []
+                    user_info[message.from_user.id]['photo_qty'] = message.text
+                    for i in range(int(user_info[message.from_user.id]['photo_qty'])):
+                        media_group.append(InputMediaPhoto(hotel['hotel_images'][i], caption=text if i == 0 else ''))
+                    bot.send_media_group(chat_id=message.from_user.id, media=media_group)
+                else:
+                    bot.send_message(message.from_user.id, text)
         except NoHotelsError as hotels_error:
             bot.send_message(message.from_user.id, str(hotels_error))
         except APIError as api_error:
@@ -442,7 +392,7 @@ def main_func(message: types.Message) -> None:
 
     @bot.callback_query_handler(func=DetailedTelegramCalendar.func(calendar_id=2))
     def call_checkout(call) -> None:
-        checkin_date = user_info[call.message.chat.id]['checkin'].split('-')
+        checkin_date = str(user_info[call.message.chat.id]['checkin']).split('-')
         result, key, step = DetailedTelegramCalendar(min_date=datetime.date(year=int(checkin_date[0]),
                                                                             month=int(checkin_date[1]),
                                                                             day=int(checkin_date[2])),

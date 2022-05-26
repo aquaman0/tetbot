@@ -1,8 +1,32 @@
 import requests
 import json
 import re
-from telebot.types import InputMediaPhoto
-from config import APIError, CityFindingError
+from config import APIError, CityFindingError, NoHotelsError
+from collections.abc import Iterable
+
+
+LOCALE = 'en_EN'
+CURRENCY = 'USD'
+URL = "https://hotels-com-provider.p.rapidapi.com/v1/hotels/search"
+HEADERS = {
+        'x-rapidapi-host': "hotels-com-provider.p.rapidapi.com",
+        'x-rapidapi-key': "b448616148mshc86ccd41d33c3dfp18ab05jsn28b912e1ca26"
+    }
+
+
+def api_request(querystring: dict, url: str) -> json:
+    """
+    Общая функция для запроса к API.
+    :param querystring: Словарь с параметрами для API.
+    :param url: Ссылка на API.
+    :return: Ответ от API.
+    """
+    api_response = requests.request("GET", url, headers=HEADERS, params=querystring)
+    if api_response.status_code == 200:
+        api_response = json.loads(api_response.text)
+    else:
+        raise APIError
+    return api_response
 
 
 def get_cities_dict(user_city: str) -> dict:
@@ -23,54 +47,86 @@ def get_cities_dict(user_city: str) -> dict:
 
     querystring = {"query": user_city, "currency": "RUB", "locale": "ru_RU"}
 
-    headers = {
-        'x-rapidapi-host': "hotels-com-provider.p.rapidapi.com",
-        'x-rapidapi-key': "b448616148mshc86ccd41d33c3dfp18ab05jsn28b912e1ca26"
-    }
-    response = requests.request("GET", url, headers=headers, params=querystring)
-    if response.status_code == 200:
-        data_response = json.loads(response.text)
-        cities_list = data_response['suggestions'][0]['entities']
-        cities_dict = {}
-        for i_city in cities_list:
-            if i_city['type'] == 'CITY':
-                city = re.sub(r"<span class='highlighted'>", '', i_city['caption'])
-                city = re.sub(r"</span>", '', city)
-                cities_dict[i_city['destinationId']] = city
-
-        if cities_dict:
-            return cities_dict
-        else:
-            raise CityFindingError
-
+    response = api_request(querystring, url)
+    cities_list = response['suggestions'][0]['entities']
+    cities_dict = {}
+    for i_city in cities_list:
+        if i_city['type'] == 'CITY':
+            city = re.sub(r"<span class='highlighted'>", '', i_city['caption'])
+            city = re.sub(r"</span>", '', city)
+            cities_dict[i_city['destinationId']] = city
+    if cities_dict:
+        return cities_dict
     else:
-        raise APIError
+        raise CityFindingError
 
 
-def get_photos(hotel_id: int, qty: str) -> list:
+def get_hotels_info(data: dict) -> json:
+    """
+    Функция, возвращающая пользователю словарь с информацией об отелях.
+    :param data: Словарь с информацией о пользователе.
+    :return: Информация об отелях в json.
+    """
+    url = "https://hotels-com-provider.p.rapidapi.com/v1/hotels/search"
+
+    if data['user_command'] == '/bestdeal':
+        querystring = {"checkin_date": data['checkin'], "checkout_date": data['checkout'],
+                       "sort_order": data['sort_order'], "destination_id": data['city_id'],
+                       "adults_number": "1", "locale": "ru_RU", "currency": "RUB",
+                       "price_min": data['min_price'], "price_max": data['max_price']}
+    else:
+        querystring = {"checkin_date": data['checkin'], "checkout_date": data['checkout'],
+                   "sort_order": data['sort_order'], "destination_id": data['city_id'], "adults_number": "1",
+                   "locale": "ru_RU", "currency": "RUB", "page_number": "1"}
+    response = api_request(querystring, url)
+    if response['searchResults']['results']:
+        response = response['searchResults']['results']
+    else:
+        raise NoHotelsError
+    return response
+
+
+def get_photos(hotel_id: int) -> json:
     """
     Функция, которая создаёт список из InputMediaPhoto-объектов по id отеля, полученного
     от пользователя в соответствии с заданным количеством.
 
     :param hotel_id: id отеля.
-    :param qty: Количество фотографий.
-    :return: Список InputMediaPhoto-объектов.
+    :return: Словарь в формате json.
     """
     url = "https://hotels-com-provider.p.rapidapi.com/v1/hotels/photos"
 
     querystring = {"hotel_id": hotel_id}
 
-    headers = {
-        "X-RapidAPI-Host": "hotels-com-provider.p.rapidapi.com",
-        "X-RapidAPI-Key": "b448616148mshc86ccd41d33c3dfp18ab05jsn28b912e1ca26"
-    }
+    response = api_request(querystring, url)
+    return response
 
-    response = requests.request("GET", url, headers=headers, params=querystring)
-    data_response = json.loads(response.text)
-    all_photos = []
-    for i, photo in enumerate(data_response, start=0):
-        i += 1
-        all_photos.append(InputMediaPhoto(photo['mainUrl']))
-        if i == int(qty):
+
+def get_hotels(data: dict) -> Iterable[dict]:
+    """
+    Функция, которая получает из функции get_hotels_info словарь с отелями в формате json,
+    записывает информацию в словарь и гененрирует ответ для пользователя.
+
+    :param data: Словарь с информацией о пользователе.
+    """
+    hotels_qty = 0
+    hotels = get_hotels_info(data)
+    period = data['checkout'] - data['checkin']
+    for hotel in hotels:
+        hotels_qty += 1
+        total_price = str(round(hotel["ratePlan"]["price"]["exactCurrent"] * period.days, 2)) + ' RUB'
+        response = {'hotel_name': hotel["name"],
+                    'hotel_address': hotel["address"]["streetAddress"],
+                    'center_distance': hotel["landmarks"][0]["distance"],
+                    'price_current': hotel["ratePlan"]["price"]["current"],
+                    'price_total': total_price,
+                    'web': f'www.hotels.com/ho{str(hotel["id"])}'}
+        images = get_photos(hotel['id'])
+        hotel_images = []
+        for image in images:
+            hotel_images.append(image['baseUrl'].replace('{size}', 'z'))
+        response['hotel_images'] = hotel_images[:9]
+        yield response
+        if hotels_qty == int(data['hotelsQty']):
             break
-    return all_photos
+

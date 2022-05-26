@@ -4,6 +4,10 @@ from config import APIError, NoHotelsError
 from datetime import datetime
 
 
+
+
+
+
 def lowprice(data: dict):
     """
     Функция, которая осуществляет поиск отелей, фильтруя их по возрастанию цены, получая
@@ -39,9 +43,7 @@ def lowprice(data: dict):
 
     response = requests.request("GET", url, headers=headers, params=querystring)
     if response.status_code == 200:
-        checkin = data['checkin'].split('-')
-        checkout = data['checkout'].split('-')
-        period = datetime(int(checkout[0]), int(checkout[1]), int(checkout[2])) - datetime(int(checkin[0]), int(checkin[1]), int(checkin[2]))
+        period = data['checkout'] - data['checkin']
         data_response = json.loads(response.text)
         if data_response['searchResults']['results']:
             for i, hotel in enumerate(data_response['searchResults']['results'], start=0):
