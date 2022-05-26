@@ -10,7 +10,6 @@ from highprice import highprice
 from config import token, CityInputError, APIError, ElemQtyError, PriceRangeInputError, CityFindingError
 from config import MinMaxError, DistanceError, HotelsQtyError, YesOrNoError, NoHotelsError, NoHistoryError
 from botdb import insert, fetch_by_id, create_db, is_db_exists
-from collections.abc import Callable
 
 bot = telebot.TeleBot(token)
 
@@ -65,7 +64,6 @@ def main_func(message: types.Message) -> None:
     Далее вызывается вложенная функция "first_step".
     """
 
-
     def first_step(message: types.Message) -> None:
         """
         Вложенная функция основной функции "main_func", которая при вызове
@@ -104,7 +102,7 @@ def main_func(message: types.Message) -> None:
         """
 
         try:
-            if message.text.isalpha():
+            if not any(d in message.text for d in '0123456789'):
                 cities_dict: dict = get_cities_dict(message.text)
                 cities = cities_dict.values()
                 cities_markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
@@ -394,7 +392,8 @@ def main_func(message: types.Message) -> None:
                           f'Адрес отеля: {str(i_hotel[2])}\n'\
                           f'От центра: {str(i_hotel[3])}\n'\
                           f'Цена за ночь: {str(i_hotel[4])}\n'\
-                          f'Общая стоимость: {str(i_hotel[5])}\n'
+                          f'Общая стоимость: {str(i_hotel[5])}\n'\
+                          f'Ссылка: {str(i_hotel[6])}'
                     bot.send_message(message.from_user.id, msg)
                     user_info[message.from_user.id]['results'].append(msg)
                     if message.text.isdigit():
@@ -407,7 +406,8 @@ def main_func(message: types.Message) -> None:
                           f'Адрес отеля: {str(i_hotel[2])}\n' \
                           f'От центра: {str(i_hotel[3])}\n' \
                           f'Цена за ночь: {str(i_hotel[4])}\n' \
-                          f'Общая стоимость: {str(i_hotel[5])}\n'
+                          f'Общая стоимость: {str(i_hotel[5])}\n'\
+                          f'Ссылка: {str(i_hotel[6])}'
                     bot.send_message(message.from_user.id, msg)
                     user_info[message.from_user.id]['results'].append(msg)
                     if message.text.isdigit():
@@ -420,7 +420,8 @@ def main_func(message: types.Message) -> None:
                           f'Адрес отеля: {str(i_hotel[2])}\n' \
                           f'От центра: {str(i_hotel[3])}\n' \
                           f'Цена за ночь: {str(i_hotel[4])}\n' \
-                          f'Общая стоимость: {str(i_hotel[5])}\n'
+                          f'Общая стоимость: {str(i_hotel[5])}\n'\
+                          f'Ссылка: {str(i_hotel[6])}'
                     bot.send_message(message.from_user.id, msg)
                     user_info[message.from_user.id]['results'].append(msg)
                     if message.text.isdigit():
@@ -442,7 +443,7 @@ def main_func(message: types.Message) -> None:
         help_func(message)
 
     @bot.callback_query_handler(func=DetailedTelegramCalendar.func(calendar_id=1))
-    def call_checkin(call: Callable[types.Message]) -> None:
+    def call_checkin(call) -> None:
         result, key, step = DetailedTelegramCalendar(min_date=datetime.date.today(),
                                                      locale='ru',
                                                      calendar_id=1).process(call.data)
@@ -458,7 +459,7 @@ def main_func(message: types.Message) -> None:
             checkin(call.message.chat, result)
 
     @bot.callback_query_handler(func=DetailedTelegramCalendar.func(calendar_id=2))
-    def call_checkout(call: Callable[types.Message]) -> None:
+    def call_checkout(call) -> None:
         checkin_date = user_info[call.message.chat.id]['checkin'].split('-')
         result, key, step = DetailedTelegramCalendar(min_date=datetime.date(year=int(checkin_date[0]),
                                                                             month=int(checkin_date[1]),

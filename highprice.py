@@ -47,16 +47,17 @@ def highprice(data: dict) -> Iterable[tuple]:
         if data_response['searchResults']['results']:
             for i, hotel in enumerate(data_response['searchResults']['results'], start=0):
                 i += 1
+                total_price = str(round(hotel["ratePlan"]["price"]["exactCurrent"] * period.days, 2)) + ' RUB'
                 if 'streetAddress' in hotel['address']:
                     yield hotel['id'], hotel['name'], hotel['address']['streetAddress'], \
                           hotel['landmarks'][0]['distance'], hotel['ratePlan']['price']['current'], \
-                          str(round(hotel['ratePlan']['price']['exactCurrent'] * period.days, 2)) + ' RUB'
+                          total_price, 'www.hotels.com/ho' + str(hotel['id'])
                     if i == int(data['hotelsQty']):
                         break
                 else:
                     yield hotel['id'], hotel['name'], hotel['address']['locality'], \
                           hotel['landmarks'][0]['distance'], hotel['ratePlan']['price']['current'], \
-                          str(round(hotel['ratePlan']['price']['exactCurrent'] * period.days, 2)) + ' RUB'
+                          total_price, 'www.hotels.com/ho' + str(hotel['id'])
                     if i == int(data['hotelsQty']):
                         break
         else:

@@ -2,10 +2,9 @@ import requests
 import json
 from config import APIError, NoHotelsError
 from datetime import datetime
-from collections.abc import Iterable
 
 
-def lowprice(data: dict) -> Iterable[tuple]:
+def lowprice(data: dict):
     """
     Функция, которая осуществляет поиск отелей, фильтруя их по возрастанию цены, получая
     данные от пользователя.
@@ -47,16 +46,17 @@ def lowprice(data: dict) -> Iterable[tuple]:
         if data_response['searchResults']['results']:
             for i, hotel in enumerate(data_response['searchResults']['results'], start=0):
                 i += 1
+                total_price = str(round(hotel["ratePlan"]["price"]["exactCurrent"] * period.days, 2)) + ' RUB'
                 if 'streetAddress' in hotel['address']:
                     yield hotel['id'], hotel['name'], hotel['address']['streetAddress'], \
                           hotel['landmarks'][0]['distance'], hotel['ratePlan']['price']['current'], \
-                          str(round(hotel['ratePlan']['price']['exactCurrent'] * period.days, 2)) + ' RUB'
+                          total_price, 'www.hotels.com/ho' + str(hotel['id'])
                     if i == int(data['hotelsQty']):
                         break
                 else:
                     yield hotel['id'], hotel['name'], hotel['address']['locality'], \
                           hotel['landmarks'][0]['distance'], hotel['ratePlan']['price']['current'], \
-                          str(round(hotel['ratePlan']['price']['exactCurrent'] * period.days, 2)) + ' RUB'
+                          total_price, 'www.hotels.com/ho' + str(hotel['id'])
                     if i == int(data['hotelsQty']):
                         break
         else:
