@@ -388,42 +388,24 @@ def main_func(message: types.Message) -> None:
         try:
             if user_info[message.from_user.id]['user_command'] == '/lowprice':
                 for i_hotel in lowprice(user_info[message.from_user.id]):
-                    msg = f'Название отеля: {str(i_hotel[1])}\n'\
-                          f'Адрес отеля: {str(i_hotel[2])}\n'\
-                          f'От центра: {str(i_hotel[3])}\n'\
-                          f'Цена за ночь: {str(i_hotel[4])}\n'\
-                          f'Общая стоимость: {str(i_hotel[5])}\n'\
-                          f'Ссылка: {str(i_hotel[6])}'
-                    bot.send_message(message.from_user.id, msg)
-                    user_info[message.from_user.id]['results'].append(msg)
+                    bot.send_message(message.from_user.id, i_hotel[1])
+                    user_info[message.from_user.id]['results'].append(i_hotel[1])
                     if message.text.isdigit():
                         user_info[message.from_user.id]['photoQty'] = message.text
                         user_info[message.from_user.id]['photos'] = get_photos(i_hotel[0], message.text)
                         bot.send_media_group(message.from_user.id, user_info[message.from_user.id]['photos'])
             elif user_info[message.from_user.id]['user_command'] == '/highprice':
                 for i_hotel in highprice(user_info[message.from_user.id]):
-                    msg = f'Название отеля: {str(i_hotel[1])}\n' \
-                          f'Адрес отеля: {str(i_hotel[2])}\n' \
-                          f'От центра: {str(i_hotel[3])}\n' \
-                          f'Цена за ночь: {str(i_hotel[4])}\n' \
-                          f'Общая стоимость: {str(i_hotel[5])}\n'\
-                          f'Ссылка: {str(i_hotel[6])}'
-                    bot.send_message(message.from_user.id, msg)
-                    user_info[message.from_user.id]['results'].append(msg)
+                    bot.send_message(message.from_user.id, i_hotel[1])
+                    user_info[message.from_user.id]['results'].append(i_hotel[1])
                     if message.text.isdigit():
                         user_info[message.from_user.id]['photoQty'] = message.text
                         user_info[message.from_user.id]['photos'] = get_photos(i_hotel[0], message.text)
                         bot.send_media_group(message.from_user.id, user_info[message.from_user.id]['photos'])
             elif user_info[message.from_user.id]['user_command'] == '/bestdeal':
                 for i_hotel in bestdeal(user_info[message.from_user.id]):
-                    msg = f'Название отеля: {str(i_hotel[1])}\n' \
-                          f'Адрес отеля: {str(i_hotel[2])}\n' \
-                          f'От центра: {str(i_hotel[3])}\n' \
-                          f'Цена за ночь: {str(i_hotel[4])}\n' \
-                          f'Общая стоимость: {str(i_hotel[5])}\n'\
-                          f'Ссылка: {str(i_hotel[6])}'
-                    bot.send_message(message.from_user.id, msg)
-                    user_info[message.from_user.id]['results'].append(msg)
+                    bot.send_message(message.from_user.id, i_hotel[1])
+                    user_info[message.from_user.id]['results'].append(i_hotel[1])
                     if message.text.isdigit():
                         user_info[message.from_user.id]['photoQty'] = message.text
                         user_info[message.from_user.id]['photos'] = get_photos(i_hotel[0], message.text)

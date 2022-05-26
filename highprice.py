@@ -49,17 +49,22 @@ def highprice(data: dict) -> Iterable[tuple]:
                 i += 1
                 total_price = str(round(hotel["ratePlan"]["price"]["exactCurrent"] * period.days, 2)) + ' RUB'
                 if 'streetAddress' in hotel['address']:
-                    yield hotel['id'], hotel['name'], hotel['address']['streetAddress'], \
-                          hotel['landmarks'][0]['distance'], hotel['ratePlan']['price']['current'], \
-                          total_price, 'www.hotels.com/ho' + str(hotel['id'])
-                    if i == int(data['hotelsQty']):
-                        break
+                    hotel_description = f'Название отеля: {hotel["name"]}\n' \
+                                        f'Адрес отеля: {hotel["address"]["streetAddress"]}\n' \
+                                        f'От центра: {hotel["landmarks"][0]["distance"]}\n' \
+                                        f'Цена за ночь: {hotel["ratePlan"]["price"]["current"]}\n' \
+                                        f'Общая стоимость: {total_price}\n' \
+                                        f'Ссылка: www.hotels.com/ho{str(hotel["id"])}'
                 else:
-                    yield hotel['id'], hotel['name'], hotel['address']['locality'], \
-                          hotel['landmarks'][0]['distance'], hotel['ratePlan']['price']['current'], \
-                          total_price, 'www.hotels.com/ho' + str(hotel['id'])
-                    if i == int(data['hotelsQty']):
-                        break
+                    hotel_description = f'Название отеля: {hotel["name"]}\n' \
+                                        f'Адрес отеля: {hotel["address"]["locality"]}\n' \
+                                        f'От центра: {hotel["landmarks"][0]["distance"]}\n' \
+                                        f'Цена за ночь: {hotel["ratePlan"]["price"]["current"]}\n' \
+                                        f'Общая стоимость: {total_price}\n' \
+                                        f'Ссылка: www.hotels.com/ho{str(hotel["id"])}'
+                yield hotel['id'], hotel_description
+                if i == int(data['hotelsQty']):
+                    break
         else:
             raise NoHotelsError
     else:
