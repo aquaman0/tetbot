@@ -350,7 +350,7 @@ def main_func(message: types.Message) -> None:
                        f'От центра: {hotel["center_distance"]}\n'\
                        f'Цена за ночь: {hotel["price_current"]}\n'\
                        f'Общая стоимость: {hotel["price_total"]}\n'\
-                       f'Ссылка: {hotel["web"]}'
+                       f'Ссылка: {hotel["web"]}\n'
                 user_info[message.from_user.id]['results'].append(text)
                 if message.text.isdigit():
                     media_group = []

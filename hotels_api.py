@@ -129,4 +129,3 @@ def get_hotels(data: dict) -> Iterable[dict]:
         yield response
         if hotels_qty == int(data['hotelsQty']):
             break
-
