@@ -1,7 +1,7 @@
 import re
 from telebot import types
 
-token = '5373986484:AAE_Q_jmOFX6TT5LnDUr7prCHrg9XkIrH-Q'
+token = 'TokenThatYouGetFromBotFather'
 
 
 def city_choose_markup(cities):
